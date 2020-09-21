@@ -8,19 +8,34 @@ output:
 
 ```{r}
 rm(list= ls())
+# Well donw!
+# You can put your text lines out of the code blocks, just like how you write a report.
+# I made a few edits as an example for you.
 ```
 
+##1 (a)
+
+0.7 in binary is 0.10110011001
+
+0.2 in binary is 0.00110011001
+
+0.1 in binary is 0.00011001100
+
+
+##1 (b) (c) (d)
+
 ```{r}
-#1 (a) 
-#0.7 in binary is 0.10110011001
-#0.2 in binary is 0.00110011001
-#0.1 in binary is 0.00011001100
-#1 (b) (c) (d)
 (0.7+0.2)+0.1==1
 0.7+(0.2+0.1)==1
 (0.7+0.1)+0.2==1
-#1 (e) 0.7, 0.2, 0.1 are binary floating-point numbers. For the partial sum of 0.7 + 0.2, we lost the last two digis of 0.2 when we align the exponents. Then we add 0.1 to the partial sum and we lost three digits from 0.1 when we align the exponents. The final result is not exactly equal to 1.
+```
 
+##1 (e) 
+
+0.7, 0.2, 0.1 are binary floating-point numbers. For the partial sum of 0.7 + 0.2, we lost the last two digis of 0.2 when we align the exponents. Then we add 0.1 to the partial sum and we lost three digits from 0.1 when we align the exponents. The final result is not exactly equal to 1.
+
+
+```{r}
 #2 (a)
 library(ggplot2)
 x=seq(from=0.988, to=1.012, by=0.001)
