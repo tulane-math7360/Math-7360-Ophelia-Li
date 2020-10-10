@@ -21,7 +21,7 @@ Daily_counts=read_excel("daily.xlsx")
 Daily_counts=tibble(Daily_counts)
 ggplot(data = Daily_counts) + 
   geom_point(mapping = aes(x = Lab_Collection_Date, y = Daily_Test_Count)) + 
-  facet_wrap(~Parish, nrow = 6) +
+  facet_wrap(~Parish, nrow = 8) +
   labs(title = "Daily test counts by Parish")
 ```
 
@@ -29,7 +29,7 @@ ggplot(data = Daily_counts) +
 ```{r}
 ggplot(data = Daily_counts) + 
   geom_point(mapping = aes(x = Lab_Collection_Date, y = Daily_Negative_Test_Count)) + 
-  facet_wrap(~Parish, nrow = 6) +
+  facet_wrap(~Parish, nrow = 8) +
   labs(title = "Daily Negative test counts by Parish")
 ```
 
@@ -37,7 +37,7 @@ ggplot(data = Daily_counts) +
 ```{r}
 ggplot(data = Daily_counts) + 
   geom_point(mapping = aes(x = Lab_Collection_Date, y = Daily_Positive_Test_Count)) + 
-  facet_wrap(~Parish, nrow = 6) +
+  facet_wrap(~Parish, nrow = 8) +
   labs(title = "Daily Positive test counts by Parish")
 ```
 
@@ -71,7 +71,7 @@ ggplot(data = gender, mapping = aes(x = Week, y = Weekly_Case_Count)) +
 gender_region=read.csv("gender_region.csv")
 ggplot(data = gender_region) + 
   geom_point(mapping = aes(x = Week, y = Weekly_Case_Count, color = Gender)) +
-  facet_wrap(~ Location, nrow = 4)
+  facet_wrap(~ Location, nrow = 4)+
   labs(title = "Weekly case count by Gender and Region")
 ```
 
@@ -80,7 +80,7 @@ ggplot(data = gender_region) +
 gender_parish=read.csv("gender_parish.csv")
 ggplot(data = gender_parish) + 
   geom_point(mapping = aes(x = Week, y = Weekly_Case_Count, color = Gender)) +
-  facet_wrap(~ Location,  nrow = 6) +
+  facet_wrap(~ Location,  nrow = 8)+
   labs(title = "Weekly case count by Gender and Parish")
 ```
 
@@ -101,7 +101,7 @@ Race3=Race3 %>%
   pivot_longer(c(`Cases_White`,`Cases_Black`,`Cases_LatinX`,`Cases_Asian`,`Cases_AIAN`,`Cases_NHPI`,`Cases_Multiracial`,`Cases_Other`,`Cases_Unknown`,`Cases_Ethnicity_Hispanic`,`Cases_Ethnicity_NonHispanic`,`Cases_Ethnicity_Unknown`), names_to = "Race", values_to = "daily_case")
 ggplot(data = Race3) + 
   geom_point(mapping = aes(x = Date, y = daily_case)) +
-  facet_wrap(~ Race, nrow = 5) +
+  facet_wrap(~ Race, nrow = 4) +
   labs(title = "Daily case count by Race group of State LA")
 ```
 
@@ -112,7 +112,7 @@ Race5=Race5 %>%
   pivot_longer(c(`Deaths_White`:`Deaths_Ethnicity_Unknown`), names_to = "Race", values_to = "daily_death")
 ggplot(data = Race5) + 
   geom_point(mapping = aes(x = Date, y = daily_death)) +
-  facet_wrap(~ Race, nrow = 5) +
+  facet_wrap(~ Race, nrow = 4) +
   labs(title = "Daily death count by Race group of State LA")
 ```
 
@@ -231,7 +231,6 @@ cumulative=testbyweek %>%
  mutate(cumulative2 = cumsum(n)/sum(n))
 cumulative=select(cumulative, -n)
 left_join(testbyweek,cumulative,by="Weekly Positive Test Count")
-print(testbyweek)
 ```
 
 ### Plot the cumulative percent positivity of tests of Parish on a map for the weeks containing dates 
