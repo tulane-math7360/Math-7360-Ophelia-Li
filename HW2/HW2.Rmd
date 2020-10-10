@@ -1,0 +1,324 @@
+---
+title: "HW2"
+author: "Ophelia Li"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r}
+rm(list = ls())
+library(tidyverse)
+library(readxl)
+library(zoo)
+```
+
+## Q1
+### Daily test counts by Parish
+```{r}
+Daily_counts=read_excel("daily.xlsx")
+Daily_counts=tibble(Daily_counts)
+ggplot(data = Daily_counts) + 
+  geom_point(mapping = aes(x = Lab_Collection_Date, y = Daily_Test_Count)) + 
+  facet_wrap(~Parish, nrow = 6) +
+  labs(title = "Daily test counts by Parish")
+```
+
+### Daily Negative test counts by Parish
+```{r}
+ggplot(data = Daily_counts) + 
+  geom_point(mapping = aes(x = Lab_Collection_Date, y = Daily_Negative_Test_Count)) + 
+  facet_wrap(~Parish, nrow = 6) +
+  labs(title = "Daily Negative test counts by Parish")
+```
+
+### Daily Positive test counts by Parish
+```{r}
+ggplot(data = Daily_counts) + 
+  geom_point(mapping = aes(x = Lab_Collection_Date, y = Daily_Positive_Test_Count)) + 
+  facet_wrap(~Parish, nrow = 6) +
+  labs(title = "Daily Positive test counts by Parish")
+```
+
+### Weekly total case count by Age group
+```{r}
+Age_group=read.csv("age.csv")
+ggplot(data = Age_group, mapping = aes(x = Week, y = Weekly_Case_Count)) + 
+  geom_point(mapping = aes(color = Age_Range)) + 
+  labs(title = "Weekly total case count by Age group", position = "jitter")
+```
+
+### Weekly case count by Age group and Region
+```{r}
+Age_region=read.csv("Age_region.csv")
+ggplot(data = Age_region) + 
+  geom_point(mapping = aes(x = Week, y = Weekly_Case_Count, color = Location)) +
+  facet_wrap(~ Age_Range, nrow = 3) +
+  labs(title = "Weekly case count by Age group and Region", position = "jitter")
+```
+
+### Weekly total case count by Gender
+```{r}
+gender=read.csv("gender.csv")
+ggplot(data = gender, mapping = aes(x = Week, y = Weekly_Case_Count)) + 
+  geom_point(mapping = aes(color = Gender)) + 
+  labs(title = "Weekly total case count by Gender", position = "jitter")
+```
+
+### Weekly case count by Gender and Region
+```{r}
+gender_region=read.csv("gender_region.csv")
+ggplot(data = gender_region) + 
+  geom_point(mapping = aes(x = Week, y = Weekly_Case_Count, color = Gender)) +
+  facet_wrap(~ Location, nrow = 4)
+  labs(title = "Weekly case count by Gender and Region")
+```
+
+### Weekly case count by Gender and Parish
+```{r}
+gender_parish=read.csv("gender_parish.csv")
+ggplot(data = gender_parish) + 
+  geom_point(mapping = aes(x = Week, y = Weekly_Case_Count, color = Gender)) +
+  facet_wrap(~ Location,  nrow = 6) +
+  labs(title = "Weekly case count by Gender and Parish")
+```
+
+### Daily case count by Race group of State LA
+```{r}
+Race1=read_excel("Race.xlsx")
+Race1=tibble(Race1)
+Race2=filter(Race1, State == 'LA')
+Race2=Race2 %>% 
+  separate(Date, into = c("year", "date"), sep = 4)
+Race2=Race2 %>% 
+  separate(date, into = c("month", "day"), sep = 2)
+Race2=Race2 %>% 
+  unite(Date,year, month, day, sep = "-")
+Race2$Date=as.Date.factor(Race2$Date)
+Race3=select(Race2,Date,State,Cases_White:Cases_Ethnicity_Unknown)
+Race3=Race3 %>%
+  pivot_longer(c(`Cases_White`,`Cases_Black`,`Cases_LatinX`,`Cases_Asian`,`Cases_AIAN`,`Cases_NHPI`,`Cases_Multiracial`,`Cases_Other`,`Cases_Unknown`,`Cases_Ethnicity_Hispanic`,`Cases_Ethnicity_NonHispanic`,`Cases_Ethnicity_Unknown`), names_to = "Race", values_to = "daily_case")
+ggplot(data = Race3) + 
+  geom_point(mapping = aes(x = Date, y = daily_case)) +
+  facet_wrap(~ Race, nrow = 5) +
+  labs(title = "Daily case count by Race group of State LA")
+```
+
+### Daily death count by Race group of State LA
+```{r}
+Race5=select(Race2,Date,State,Deaths_White:Deaths_Ethnicity_Unknown)
+Race5=Race5 %>%
+  pivot_longer(c(`Deaths_White`:`Deaths_Ethnicity_Unknown`), names_to = "Race", values_to = "daily_death")
+ggplot(data = Race5) + 
+  geom_point(mapping = aes(x = Date, y = daily_death)) +
+  facet_wrap(~ Race, nrow = 5) +
+  labs(title = "Daily death count by Race group of State LA")
+```
+
+## Q2
+```{r}
+Daily_counts=read_excel("daily.xlsx")
+combine1=Daily_counts %>%
+  select(Lab_Collection_Date,Parish,Daily_Case_Count)
+combine1=combine1 %>%
+  pivot_wider(names_from = Parish, values_from = Daily_Case_Count)
+Race1=read_excel("Racecopy.xlsx")
+combine2=Race1 %>%
+  select(Lab_Collection_Date,Cases_Total)
+combine3=left_join(combine1, combine2, by = "Lab_Collection_Date")
+combine3=combine3 %>%
+  pivot_longer(c(`Acadia`:`Winn`), names_to = "Parish", values_to = "Daily_Cases")
+print(combine3)
+```
+
+### Plot
+```{r}
+ggplot(data = combine3) + 
+ geom_point(mapping = aes(x = Lab_Collection_Date, y = Daily_Cases, color = Cases_Total)) +
+  facet_wrap(~ Parish, nrow = 8)
+```
+
+### Findings
+```{r}
+#By combining daily cases from two sources—by parish and by race, we created a new table. Fluctuations in daily case counts happened mostly in Calcasieu, East Baton Rouge, Jefferson, Orleans, and Lafayette parishes.
+```
+
+## Q3
+### New Tests
+```{r}
+louisiana_history=read_excel("louisiana_history.xlsx")
+newtest=select(louisiana_history, date, state, totalTestResultsIncrease)
+newtest=newtest %>%
+    group_by(state) %>% 
+    mutate(newtesttotal_new = rollmean(totalTestResultsIncrease, k=7, align="left", fill=NA)) %>%
+  ungroup()
+newtest=head(newtest,90)
+newtest1=newtest %>%
+  pivot_longer(names_to = "newtesttotal_key", values_to = "newtesttotal_value", newtesttotal_new)
+newtest %>% 
+  ggplot(aes(x = date, y = totalTestResultsIncrease))+
+    geom_col(alpha= 0.4,fill="#9966FF",linetype = 0)+ 
+    geom_line(data = newtest1, mapping = aes(x = date, y = newtesttotal_value), color ="#333366", size = 1)+
+    theme_bw()+
+    labs(x = "", y = "")+
+    labs(title = "New tests (Calculated)", subtitle = "Total test result (People)")
+```
+
+### New cases
+```{r}
+newcases=select(louisiana_history, date, state, positiveIncrease)
+newcases=newcases %>%
+    group_by(state) %>% 
+    mutate(newcases_new = rollmean(positiveIncrease, k = 7, fill = NA, align = "left")) %>% 
+  ungroup()
+newcases=head(newcases,90)
+newcases1=newcases %>% 
+  pivot_longer(names_to = "newcases_key", values_to = "newcases_value", newcases_new)
+newcases %>% 
+  ggplot(aes(x = date, y = positiveIncrease)) +
+    geom_col(alpha= 0.4,fill="#FF6633",linetype = 0)+ 
+    geom_line(data = newcases1, mapping = aes(x = date, y = newcases_value), color ="#FF0000", size = 1)+
+    theme_bw()+
+    labs(x = "", y = "")+
+    labs(title = "New cases (Calculated)")
+```
+
+### Current hospitalizations
+```{r}
+currenthos=select(louisiana_history, date, state, hospitalizedCurrently)
+currenthos=currenthos %>%
+    group_by(state) %>% 
+    mutate(currenthos_new = rollmean(hospitalizedCurrently, k = 7, fill = NA, align = "left")) %>% 
+  ungroup()
+currenthos=head(currenthos,90)
+currenthos1=currenthos %>% 
+  pivot_longer(names_to = "currenthos_key", values_to = "currenthos_value", currenthos_new)
+currenthos %>% 
+  ggplot(aes(x = date, y = hospitalizedCurrently)) +
+    geom_col(alpha= 0.4,fill="#3399FF",linetype = 0)+ 
+    geom_line(data = currenthos1, mapping = aes(x = date, y = currenthos_value), color ="#0066CC", size = 1)+
+    theme_bw()+
+    labs(x = "", y = "")+
+    labs(title = "Current hospitalizations")
+```
+
+### New deaths 
+```{r}
+newdeaths=select(louisiana_history, date, state, deathIncrease)
+newdeaths=newdeaths %>%
+    group_by(state) %>% 
+    mutate(newdeaths_new = rollmean(deathIncrease, k = 7, fill = NA, align = "left")) %>% 
+  ungroup()
+newdeaths=head(newdeaths,90)
+newdeaths1=newdeaths %>% 
+  pivot_longer(names_to = "newdeaths_key", values_to = "newdeaths_value", newdeaths_new)
+newdeaths %>% 
+  ggplot(aes(x = date, y = deathIncrease)) +
+    geom_col(alpha= 0.4,fill="#666666",linetype = 0)+ 
+    geom_line(data = newdeaths1, mapping = aes(x = date, y = newdeaths_value), color ="#000000", size = 1)+
+    theme_bw()+
+    labs(x = "", y = "")+
+    labs(title = "New deaths")
+```
+
+## Q4
+### Compile a tibble that contains cumulative percent positivity of tests by Parish
+```{r}
+testbyweek=read_excel("test by week.xlsx", col_types = c("text", "text", "numeric", "date", "date", "numeric", "numeric", "numeric", "numeric"))
+cumulative=testbyweek %>% 
+ count(`Weekly Positive Test Count`) %>% 
+ mutate(cumulative2 = cumsum(n)/sum(n))
+cumulative=select(cumulative, -n)
+left_join(testbyweek,cumulative,by="Weekly Positive Test Count")
+print(testbyweek)
+```
+
+### Plot the cumulative percent positivity of tests of Parish on a map for the weeks containing dates 
+#### March 22, 2020 (stay at home order starts)
+```{r}
+testbyweek$`Date for start of week`=as.Date(testbyweek$`Date for start of week`)
+wk1=filter(testbyweek, `Date for start of week` == '2020-03-19')
+cumwk1=wk1 %>%
+  count(`Weekly Positive Test Count`) %>%
+  mutate(cumwk11 = cumsum(n)/sum(n))
+cumwk1=select(cumwk1, -n)
+ggplot(data = cumwk1, mapping = aes(x=`Weekly Positive Test Count`, y=cumwk11))+
+  geom_line(color = "blue")+
+  geom_point(color = "black")+
+  labs(x = "Week 1", y = "Cumulative Percent Positivity")+
+  labs(title = "March 22, 2020")
+```
+
+#### May 15, 2020 (stay at home order lifted, phase 1 starts)
+```{r}
+testbyweek$`Date for start of week`=as.Date(testbyweek$`Date for start of week`)
+wk2=filter(testbyweek, `Date for start of week` == '2020-05-14')
+cumwk2=wk2 %>%
+  count(`Weekly Positive Test Count`) %>%
+  mutate(cumwk22 = cumsum(n)/sum(n))
+cumwk2=select(cumwk2, -n)
+ggplot(data = cumwk2, mapping = aes(x=`Weekly Positive Test Count`, y=cumwk22))+
+  geom_line(color = "red")+
+  geom_point(color = "black")+
+  labs(x = "Week 2", y = "Cumulative Percent Positivity")+
+  labs(title = "May 15, 2020")
+```
+
+#### June 5, 2020 (phase 2 starts)
+```{r}
+testbyweek$`Date for start of week`=as.Date(testbyweek$`Date for start of week`)
+wk3=filter(testbyweek, `Date for start of week` == '2020-06-04')
+cumwk3=wk3 %>%
+  count(`Weekly Positive Test Count`) %>%
+  mutate(cumwk33 = cumsum(n)/sum(n))
+cumwk3=select(cumwk3, -n)
+ggplot(data = cumwk3, mapping = aes(x=`Weekly Positive Test Count`, y=cumwk33))+
+  geom_line(color = "yellow")+
+  geom_point(color = "black")+
+  labs(x = "Week 3", y = "Cumulative Percent Positivity")+
+  labs(title = "June 5, 2020")
+```
+
+#### July 13, 2020 (Mask mandate)
+```{r}
+testbyweek$`Date for start of week`=as.Date(testbyweek$`Date for start of week`)
+wk4=filter(testbyweek, `Date for start of week` == '2020-07-09')
+cumwk4=wk4 %>%
+  count(`Weekly Positive Test Count`) %>%
+  mutate(cumwk44 = cumsum(n)/sum(n))
+cumwk4=select(cumwk4, -n)
+ggplot(data = cumwk4, mapping = aes(x=`Weekly Positive Test Count`, y=cumwk44))+
+  geom_line(color = "green")+
+  geom_point(color = "black")+
+  labs(x = "Week 4", y = "Cumulative Percent Positivity")+
+  labs(title = "July 13, 2020")
+```
+
+## Q5
+### new cases by lab collection date with a 7-day average line of New Orleans
+```{r}
+caseno=filter(Daily_counts, Parish=="Orleans")
+caseno=caseno %>%
+  mutate(sevendayaverage1=rollmean(Daily_Case_Count, k=7, fill=NA))
+ggplot(data = caseno, mapping = aes(x=Lab_Collection_Date, y=Daily_Case_Count))+
+  geom_line(data = caseno, mapping = aes(x = Lab_Collection_Date, y = sevendayaverage1, group = 1), color = "red", size =1)+
+  geom_col(alpha = 0.5, fill = "blue")+
+  labs(title = "new cases by lab collection date of New Orleans", x = "Lab Collection Date", y = "New Cases")
+```
+
+### new cases by lab collection date with a 7-day average line of Baton Rouge 
+```{r}
+casebr=filter(Daily_counts, Parish=="East Baton Rouge")
+casebr=casebr %>%
+  mutate(sevendayaverage2=rollmean(Daily_Case_Count, k=7, fill=NA))
+ggplot(data = casebr, mapping = aes(x=Lab_Collection_Date, y=Daily_Case_Count))+
+  geom_line(data = casebr, mapping = aes(x = Lab_Collection_Date, y = sevendayaverage2, group = 1), color = "purple", size =1)+
+  geom_col(alpha = 0.5, fill = "orange")+
+  labs(title = "new cases by lab collection date of Baton Rouge", x = "Lab Collection Date", y = "New Cases")
+```
+
+### Findings
+```{r}
+# In New Orleans, new cases started to increase rapidly since March and peaked in April. A big drop after stay home order was lifted. Even though there were fluctuations in the new cases since May, the numbers are much lower than March's and April's numbers. Baton Rouge has an opposite tendency. In Baton Rouge, new cases started to increase rapidly since July when mask became mandate, but started to slowly decrease since August.
+```
