@@ -1,0 +1,300 @@
+---
+title: "HW3"
+author: "Ophelia Li"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document: default
+  pdf_document: default
+---
+## Q1
+### Read in the data of COVID-19 cases reported on 2020-10-18
+```{r}
+rm(list = ls())
+library(tidyverse)
+library(gtsummary)
+library(faraway)
+library(glmnet)
+```
+
+```{r}
+county_count <- read_csv("10-18-2020.csv") %>%
+  mutate(FIPS = as.numeric(FIPS)) %>%
+  filter(Country_Region == "US") %>%
+  print(width = Inf)
+```
+
+```{r}
+names(county_count) <- str_to_lower(names(county_count))
+```
+
+```{r}
+county_count %>%
+  select(province_state) %>%
+  distinct() %>%
+  arrange(province_state) %>%
+  print(n = Inf)
+```
+
+```{r}
+county_count <- county_count %>%
+  filter(!(province_state %in% c("Diamond Princess", "Grand Princess", 
+                                 "Recovered", "Guam", "Northern Mariana Islands", 
+                                 "Puerto Rico", "Virgin Islands"))) %>%
+  print(width = Inf)
+```
+
+```{r}
+county_count %>%
+  # turn into long format for easy plotting
+  pivot_longer(confirmed:recovered, 
+               names_to = "case", 
+               values_to = "count") %>%
+  group_by(province_state) %>%
+  ggplot() + 
+  geom_col(mapping = aes(x = province_state, y = `count`, fill = `case`)) + 
+  # scale_y_log10() + 
+  labs(title = "US COVID-19 Situation on 2020-10-18", x = "State") + 
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+### Read in the 2020 county-level health ranking data
+```{r}
+county_info <- read_csv("health_rankings.csv") %>%
+  filter(!is.na(county)) %>%
+  # cast fips into dbl for use as a key for joining tables
+  mutate(fips = as.numeric(fips)) %>%
+  select(fips, 
+         state,
+         county,
+         percent_fair_or_poor_health, 
+         percent_smokers, 
+         percent_adults_with_obesity, 
+         # food_environment_index,
+         percent_with_access_to_exercise_opportunities, 
+         percent_excessive_drinking,
+         # teen_birth_rate, 
+         percent_uninsured,
+         # primary_care_physicians_rate,
+         # preventable_hospitalization_rate,
+         # high_school_graduation_rate,
+         percent_some_college,
+         percent_unemployed,
+         percent_children_in_poverty,
+         # `80th_percentile_income`,
+         # `20th_percentile_income`,
+         percent_single_parent_households,
+         # violent_crime_rate,
+         percent_severe_housing_problems,
+         overcrowding,
+         # life_expectancy,
+         # age_adjusted_death_rate,
+         percent_adults_with_diabetes,
+         # hiv_prevalence_rate,
+         percent_food_insecure,
+         # percent_limited_access_to_healthy_foods,
+         percent_insufficient_sleep,
+         percent_uninsured_2,
+         median_household_income,
+         average_traffic_volume_per_meter_of_major_roadways,
+         percent_homeowners,
+         # percent_severe_housing_cost_burden,
+         population_2,
+         percent_less_than_18_years_of_age,
+         percent_65_and_over,
+         percent_black,
+         percent_asian,
+         percent_hispanic,
+         percent_female,
+         percent_rural) %>%
+  print(width = Inf)
+```
+
+```{r}
+county_count <- county_count %>%
+  filter(confirmed >= 5)
+```
+
+```{r}
+county_data <- county_count %>%
+  left_join(county_info, by = "fips") %>%
+  print(width = Inf)
+```
+
+```{r}
+summary(county_data)
+```
+
+```{r}
+county_data %>%
+  filter(is.na(state) & is.na(county)) %>%
+  print(n = Inf)
+```
+
+```{r}
+county_count %>%
+  filter(is.na(fips)) %>%
+  select(fips, admin2, province_state) %>%
+  print(n = Inf)
+```
+
+```{r}
+county_data <- county_count %>%
+  # manually set FIPS for some counties
+  mutate(fips = ifelse(admin2 == "Dukes and Nantucket" & province_state == "Massachusetts", 25019, fips)) %>% 
+  mutate(fips = ifelse(admin2 == "Weber-Morgan" & province_state == "Utah", 49057, fips)) %>%
+  filter(!(is.na(fips) | str_detect(admin2, "Out of") | str_detect(admin2, "Unassigned"))) %>%
+  left_join(county_info, by = "fips") %>%
+  drop_na() %>%
+  print(width = Inf)
+```
+
+```{r}
+summary(county_data)
+```
+
+```{r}
+county_data <- county_data %>%
+  mutate(state = as.factor(state)) %>%
+  select(county, confirmed, deaths, state, percent_fair_or_poor_health:percent_rural)
+summary(county_data)
+```
+
+```{r}
+county_data %>%
+  mutate(cfr = deaths / confirmed) %>%
+  select(county, state, confirmed, deaths, cfr) %>%
+  arrange(desc(cfr)) %>%
+  top_n(10)
+```
+
+```{r}
+write_csv(county_data, "covid19-county-data-20201018.csv.gz")
+```
+
+## Q2
+Confirmed cases may die, thus uning deaths/confirmed is not a good predictor. And confirmed cases are not the number of diagnosed people.
+
+## Q3
+Logistic regression requires the observations to be independent of each other, but each individual may not be perfectly independent of each other in this study.
+
+## Q4
+```{r}
+binaryreg=glm(cbind(deaths, confirmed - deaths) ~ . - county, family = binomial, data = county_data) 
+summary(binaryreg)
+```
+
+```{r}
+binaryreg %>%
+  tbl_regression() %>%
+  bold_labels() %>%
+  bold_p(t = 0.01)
+```
+
+## Q5
+Holding all other variables constant.
+
+Interpret "percent_65_and_over" (old people may have a greater chance of dying from COVID-19): a one-unit increase in the percentage of people who are 65 years old and older increases the odds of the CFR by 4%.
+
+Interpret "percent_adults_with_diabetes": a one-unit increase in the percentage of adults with diabetes increases the odds of the CFR by 1%.
+
+Interpret "percent_children_in_poverty": a one-unit increase in the percentage of children in poverty increases the odds of the CFR by 2%.
+
+## Q6
+### analysis of deviance to the goodness of fit of the model
+```{r}
+pchisq(binaryreg$deviance, binaryreg$df.residual, lower = FALSE)
+```
+The result shows that the model does not fit well
+
+### Analysis of deviance to the intercept-only model
+```{r}
+binaryreg$deviance
+```
+
+```{r}
+binaryreg$df.residual
+```
+
+```{r}
+binaryreg$null.deviance
+```
+
+```{r}
+binaryreg$df.null
+```
+
+```{r}
+1 - pchisq(binaryreg$null.deviance - binaryreg$deviance, binaryreg$df.null - binaryreg$df.residual)
+```
+The model is a better fit than the intercept-only model
+
+## Q7
+```{r}
+moddev=drop1(binaryreg, test = "Chi")
+rownames(moddev[order(moddev$`Pr(>Chi)`),][1:10,])
+```
+
+## Q8
+```{r}
+confint(binaryreg)
+```
+
+## Q9
+```{r}
+dev_resi=county_data %>%
+  mutate(devres=residuals(binaryreg), linpred=predict(binaryreg)) %>%
+  ggplot()+ 
+  geom_point(mapping=aes(x=linpred, y=devres))+
+  labs(x="linear predictor", y="deviance residuals")
+print(dev_resi)
+```
+
+There are two potential outliers on the right of x=-6
+
+```{r}
+dev_resi+xlim(-6,-2)
+```
+
+When we take the two potential outliers out, the plot looks better now.
+
+## Q10
+```{r}
+halfnorm(hatvalues(binaryreg), labs=county_data$county)
+```
+
+District of Columbia and Honolulu look like outliers. We will investigate more.
+
+```{r}
+county_data %>%
+slice(c(309, 537)) %>%
+  print(width=Inf)
+```
+
+It does not look like they are potential outliers in predictor space
+
+## Q11
+```{r}
+modAIC=step(binaryreg, trace = FALSE)
+summary(modAIC)
+```
+
+## Q12
+```{r}
+x_vars=model.matrix(cbind(deaths, confirmed - deaths) ~ . - 1 - county, 
+                  data = county_data)
+x_vars=x_vars[rep(1:nrow(county_data), each = 2), ]
+y_vars=rep(c(1, 0), nrow(county_data))
+combined=c(rbind(county_data$deaths, county_data$confirmed - county_data$deaths))
+set.seed(6000)
+cv_output=cv.glmnet(x_vars, y_vars, weights = combined, alpha = 1, 
+                      family = "binomial", type.measure = "auc")
+plot(cv_output)
+```
+
+```{r}
+cv_output$lambda.min
+```
+
+```{r}
+coef(cv_output, cv_output$lambda.min)
+```
