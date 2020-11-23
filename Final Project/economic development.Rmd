@@ -1,0 +1,180 @@
+---
+title: "final project"
+author: "Ophelia Li"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r}
+rm(list = ls())
+library(MASS)
+library(lattice)
+library(glmnet)
+library(faraway)
+library(tidyverse)
+library(gtsummary)
+```
+
+```{r}
+econdev=read.csv("econdev.csv")
+head(econdev)
+```
+
+```{r}
+hist(econdev$GNIpercapita, main="Frequency for GNI per capita", xlab="GNI per capita")
+qqnorm(econdev$GNIpercapita)
+qqline(econdev$GNIpercapita)
+hist(log(econdev$GNIpercapita), main="Frequency for log(GNI per capita)", xlab="log(GNI per capita)")
+qqnorm(log(econdev$GNIpercapita))
+qqline(log(econdev$GNIpercapita))
+```
+
+```{r}
+pairs(~birthrate+deathrate+infantdeaths+lifeexpM+lifeexpF+region+log(GNIpercapita),data=econdev)
+round(cor(econdev[,1:5],use="pairwise"),3)
+econdev$region=factor(econdev$region,
+                         levels=1:7,
+                         labels=c("East Asia & Pacific", "South Asia", "Europe & Central Asia", "North America", "Latin America", "Middle East & North Africa", "Sub-Saharan Africa"))
+par(mar = c(4,2,1,1)+.1)
+boxplot(log(GNIpercapita)~region,data=econdev,aexs=FALSE)
+```
+```{r}
+life.exp.avg=(econdev$lifeexpM+econdev$lifeexpF)/2
+life.exp.diff=econdev$lifeexpF-econdev$lifeexpM
+cor(life.exp.avg,life.exp.diff)
+```
+
+```{r}
+mod1=lm(log(GNIpercapita)~birthrate+deathrate+infantdeaths+life.exp.avg+life.exp.diff+region,data=econdev)
+step(mod1, trace = TRUE, direction = "both") %>%
+  tbl_regression() %>%
+  bold_labels()
+```
+
+```{r}
+mod2=lm(log(GNIpercapita) ~ birthrate + life.exp.avg + region, data=econdev)
+summary(mod2)
+plot(mod2)
+```
+
+```{r}
+mod3=lm(log(GNIpercapita)~(birthrate+deathrate+infantdeaths+life.exp.avg+life.exp.diff+region)^2,data=econdev)
+step(mod3, trace = TRUE, direction = "both") %>%
+  tbl_regression() %>%
+  bold_labels()
+```
+
+```{r}
+mod4=lm(log(GNIpercapita) ~ birthrate + deathrate + infantdeaths + life.exp.avg + 
+    life.exp.diff + region + birthrate:deathrate + birthrate:life.exp.avg + 
+    birthrate:life.exp.diff + deathrate:infantdeaths + deathrate:life.exp.avg + 
+    deathrate:life.exp.diff + infantdeaths:life.exp.avg + infantdeaths:life.exp.diff + 
+    infantdeaths:region + life.exp.avg:region, data=econdev)
+summary(mod4)
+plot(mod4)
+```
+
+```{r}
+devres_plot=econdev %>%
+  mutate(devres = residuals(mod4), linpred = predict(mod4)) %>%
+  ggplot() + 
+  geom_point(mapping = aes(x = linpred, y = devres)) +
+  labs(x = "linear predictor", y = "deviance residuals")
+print(devres_plot)
+```
+
+```{r}
+econdev %>%
+  mutate(devres = residuals(mod4), linpred = predict(mod4)) %>%
+  filter(devres >= 1.5)
+devres_plot + ylim(-1.2, 1.5)
+```
+
+```{r}
+halfnorm(hatvalues(mod4), labs=econdev$country)
+```
+
+```{r}
+#remove potential outliers
+econdev1=econdev %>%
+  filter(!(country %in% c("Canada", "United States"))) %>%
+  print(width = Inf)
+life.exp.avg=(econdev1$lifeexpM+econdev1$lifeexpF)/2
+life.exp.diff=econdev1$lifeexpF-econdev1$lifeexpM
+mod5=lm(log(GNIpercapita) ~ birthrate + deathrate + infantdeaths + life.exp.avg + 
+    life.exp.diff + region + birthrate:deathrate + birthrate:life.exp.avg + 
+    birthrate:life.exp.diff + deathrate:infantdeaths + deathrate:life.exp.avg + 
+    deathrate:life.exp.diff + infantdeaths:life.exp.avg + infantdeaths:life.exp.diff + 
+    infantdeaths:region + life.exp.avg:region, data=econdev1)
+summary(mod5)
+```
+
+```{r}
+econdev %>%
+slice(c(30, 166)) %>%
+  print(width = Inf)
+```
+
+```{r}
+halfnorm(cooks.distance(mod4))
+```
+
+```{r}
+econdev %>%
+slice(c(67, 161)) %>%
+  print(width = Inf)
+```
+
+```{r}
+#remove influential points
+econdev3=econdev %>%
+  filter(!(country %in% c("Haiti", "Turkmenistan"))) %>%
+  print(width = Inf)
+life.exp.avg=(econdev3$lifeexpM+econdev3$lifeexpF)/2
+life.exp.diff=econdev3$lifeexpF-econdev3$lifeexpM
+mod6=lm(log(GNIpercapita) ~ birthrate + deathrate + infantdeaths + life.exp.avg + 
+    life.exp.diff + region + birthrate:deathrate + birthrate:life.exp.avg + 
+    birthrate:life.exp.diff + deathrate:infantdeaths + deathrate:life.exp.avg + 
+    deathrate:life.exp.diff + infantdeaths:life.exp.avg + infantdeaths:life.exp.diff + 
+    infantdeaths:region + life.exp.avg:region, data=econdev3)
+summary(mod6)
+```
+
+```{r}
+life.exp.avg=(econdev$lifeexpM+econdev$lifeexpF)/2
+life.exp.diff=econdev$lifeexpF-econdev$lifeexpM
+x_vars <- model.matrix(log(GNIpercapita) ~ - 1 + birthrate+deathrate+infantdeaths+life.exp.avg+life.exp.diff+region, data=econdev)[, -1]
+y_var <- log(econdev$GNIpercapita)
+lambda_seq <- 10^seq(2, -2, by = -.1)
+ 
+# Splitting the data into test and train
+set.seed(200)
+train = sample(1:nrow(x_vars), nrow(x_vars)/2)
+x_test = (-train)
+y_test = y_var[x_test]
+
+#Fit lasso regression and plot solution path:
+lasso_fit <- glmnet(x_vars[train,], y_var[train], alpha = 1)
+plot(lasso_fit, xvar = "lambda", label = TRUE)
+
+#cross validation
+cv_output <- cv.glmnet(x_vars[train,], y_var[train],
+                       alpha = 1, lambda = lambda_seq, 
+                       nfolds = 5)
+summary(cv_output)
+plot(cv_output)
+
+# identifying best lamda
+best_lam <- cv_output$lambda.min
+best_lam
+```
+
+```{r}
+# Rebuilding the model with best lambda value identified
+lasso_best <- glmnet(x_vars[train,], y_var[train], alpha = 1, lambda = best_lam)
+pred <- predict(lasso_best, s = best_lam, newx = x_vars[x_test,])
+# Inspecting beta coefficients
+coef(lasso_best)
+```
